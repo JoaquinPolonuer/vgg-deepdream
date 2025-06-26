@@ -5,35 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt  # visualizations
 import yaml
 
-from config import OUT_IMAGES_PATH, SupportedModels, SupportedPretrainedWeights
-
-
-def load_config(config_path="config.yaml"):
-    """Load configuration from YAML file."""
-    with open(config_path, "r") as file:
-        config = yaml.safe_load(file)
-
-    config["img_width"] = int(config["img_width"])
-    config["pyramid_size"] = int(config["pyramid_size"])
-    config["num_gradient_ascent_iterations"] = int(config["num_gradient_ascent_iterations"])
-    config["spatial_shift_size"] = float(config["spatial_shift_size"])
-    config["smoothing_coefficient"] = float(config["smoothing_coefficient"])
-    config["lr"] = float(config["lr"])
-
-    # Convert string enum names to actual enum values
-    config["model_name"] = getattr(SupportedModels, config["model_name"]).name
-    config["pretrained_weights"] = getattr(
-        SupportedPretrainedWeights, config["pretrained_weights"]
-    ).name
-
-    # Add dump_dir and normalize input path
-    config["dump_dir"] = os.path.join(
-        OUT_IMAGES_PATH, f'{config["model_name"]}_{config["pretrained_weights"]}'
-    )
-    config["input"] = os.path.basename(config["input"])  # handle absolute and relative paths
-
-    return config
-
+from config import RUN_CONFIG
 
 def load_image(img_path, target_shape=None):
     if not os.path.exists(img_path):
@@ -57,15 +29,15 @@ def load_image(img_path, target_shape=None):
     return img
 
 
-def save_and_maybe_display_image(config, dump_img, display=False):
+def save_and_maybe_display_image(dump_img, display=False):
     assert isinstance(dump_img, np.ndarray), f"Expected numpy array got {type(dump_img)}."
 
     # Step 1: figure out the dump dir location
-    dump_dir = config["dump_dir"]
+    dump_dir = RUN_CONFIG["dump_dir"]
     os.makedirs(dump_dir, exist_ok=True)
 
     # Step 2: define the output image name
-    dump_img_name = build_image_name(config)
+    dump_img_name = build_image_name()
 
     if dump_img.dtype != np.uint8:
         dump_img = (dump_img * 255).astype(np.uint8)
@@ -88,9 +60,9 @@ def save_and_maybe_display_image(config, dump_img, display=False):
 
 # This function makes sure we can later reconstruct the image using the information encoded into the filename!
 # Again don't worry about all the arguments we'll define them later
-def build_image_name(config):
-    input_name = "rand_noise" if config["use_noise"] else config["input"].split(".")[0]
-    layers = "_".join(config["layers_to_use"])
+def build_image_name():
+    input_name = "rand_noise" if RUN_CONFIG["use_noise"] else RUN_CONFIG["input"].split(".")[0]
+    layers = "_".join(RUN_CONFIG["layers_to_use"])
     # Looks awful but makes the creation process transparent for other creators
-    img_name = f'{input_name}_width_{config["img_width"]}_model_{config["model_name"]}_{config["pretrained_weights"]}_{layers}_pyrsize_{config["pyramid_size"]}_pyrratio_{config["pyramid_ratio"]}_iter_{config["num_gradient_ascent_iterations"]}_lr_{config["lr"]}_shift_{config["spatial_shift_size"]}_smooth_{config["smoothing_coefficient"]}.jpg'
+    img_name = f'{input_name}_width_{RUN_CONFIG["img_width"]}_model_{RUN_CONFIG["model_name"]}_{RUN_CONFIG["pretrained_weights"]}_{layers}_pyrsize_{RUN_CONFIG["pyramid_size"]}_pyrratio_{RUN_CONFIG["pyramid_ratio"]}_iter_{RUN_CONFIG["num_gradient_ascent_iterations"]}_lr_{RUN_CONFIG["lr"]}_shift_{RUN_CONFIG["spatial_shift_size"]}_smooth_{RUN_CONFIG["smoothing_coefficient"]}_seed_{RUN_CONFIG["seed"]}.jpg'
     return img_name

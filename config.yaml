@@ -1,5 +1,8 @@
 # DeepDream Configuration
 
+# Reproducibility
+seed: 43
+
 # Common params
 input: "spock.jpeg"
 img_width: 600
