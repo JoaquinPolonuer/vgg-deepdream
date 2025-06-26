@@ -24,6 +24,8 @@ class Vgg16Experimental(torch.nn.Module):
         # I just used the official PyTorch implementation to figure out how to dissect VGG16:
         # https://github.com/pytorch/vision/blob/master/torchvision/models/vgg.py
         vgg_pretrained_features = vgg16.features
+        vgg_avgpool = vgg16.avgpool
+        vgg_classifier = vgg16.classifier
 
         # I've exposed the best/most interesting layers in my subjective opinion (mp5 is not that good though)
         self.layer_names = [
@@ -69,6 +71,16 @@ class Vgg16Experimental(torch.nn.Module):
         self.conv5_3 = vgg_pretrained_features[28]
         self.relu5_3 = vgg_pretrained_features[29]
         self.max_pooling5 = vgg_pretrained_features[30]
+
+        # AvgPool
+        self.avgpool = vgg_avgpool
+
+        # Classifier
+        self.linear1 = vgg_classifier[0]
+        self.relu1 = vgg_classifier[1]
+        self.linear2 = vgg_classifier[3]
+        self.relu2 = vgg_classifier[4]
+        self.linear3 = vgg_classifier[6]
 
         # Turn off these because we'll be using a pretrained network
         # if we didn't do this PyTorch would be saving gradients and eating up precious memory!
@@ -134,7 +146,34 @@ class Vgg16Experimental(torch.nn.Module):
         conv5_3 = x
         x = self.relu5_3(x)
         relu5_3 = x
-        mp5 = self.max_pooling5(x)
+        x = self.max_pooling5(x)
+        mp5 = x
+        
+        # AvgPool - handle MPS device limitation
+        if str(x.device).startswith('mps'):
+            # Move to CPU for avgpool operation due to MPS limitation
+            x_cpu = x.cpu()
+            avgpool_result = self.avgpool(x_cpu)
+            x = avgpool_result.to(x.device)
+            avgpool = x
+        else:
+            x = self.avgpool(x)
+            avgpool = x
+        
+        # Flatten
+        x = torch.flatten(x, 1)
+        
+        # Classifier
+        x = self.linear1(x)
+        linear1 = x
+        x = self.relu1(x)
+        relu1 = x
+        x = self.linear2(x)
+        linear2 = x
+        x = self.relu2(x)
+        relu2 = x
+        x = self.linear3(x)
+        linear3 = x
 
         # Finally, expose only the layers that you want to experiment with here
         vgg_outputs = namedtuple("VggOutputs", self.layer_names)
