@@ -27,15 +27,6 @@ def deep_dream_static_image(img=None):
         RUN_CONFIG["pretrained_weights"], requires_grad=False, show_progress=True
     ).to(DEVICE)
 
-    try:
-        layer_ids_to_use = [
-            model.layer_names.index(layer_name) for layer_name in RUN_CONFIG["layers_to_use"]
-        ]
-    except Exception as e:  # making sure you set the correct layer name for this specific model
-        print(f'Invalid layer names {[layer_name for layer_name in RUN_CONFIG["layers_to_use"]]}.')
-        print(f'Available layers for model {RUN_CONFIG["model_name"]} are {model.layer_names}.')
-        return
-
     if img is None:  # load either the provided image or start from a pure noise image
         img_path = os.path.join(INPUT_DATA_PATH, RUN_CONFIG["input"])
         # load a numpy, [0, 1] range, channel-last, RGB image
@@ -65,7 +56,7 @@ def deep_dream_static_image(img=None):
             input_tensor = random_circular_spatial_shift(input_tensor, h_shift, w_shift)
 
             # This is where the magic happens, treat it as a black box until the next cell
-            gradient_ascent(model, input_tensor, layer_ids_to_use, iteration)
+            gradient_ascent(model, input_tensor, iteration)
 
             # Roll back by the same amount as above (hence should_undo=True)
             input_tensor = random_circular_spatial_shift(
@@ -85,12 +76,12 @@ UPPER_IMAGE_BOUND = torch.tensor(((1 - IMAGENET_MEAN_1) / IMAGENET_STD_1).reshap
 )
 
 
-def gradient_ascent(model, input_tensor, layer_ids_to_use, iteration):
+def gradient_ascent(model, input_tensor, iteration):
     # Step 0: Feed forward pass
     out = model(input_tensor)
 
     # Step 1: Grab activations/feature maps of interest
-    activations = [out[layer_id_to_use] for layer_id_to_use in layer_ids_to_use]
+    activations = [out[layer_id_to_use] for layer_id_to_use in RUN_CONFIG["layers_to_use"]]
 
     # Step 2: Calculate loss over activations
     losses = []

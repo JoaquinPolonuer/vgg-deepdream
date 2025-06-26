@@ -15,7 +15,9 @@ class Vgg16Experimental(torch.nn.Module):
 
         # Only ImageNet weights are supported for now for this model
         if pretrained_weights == SupportedPretrainedWeights.IMAGENET.name:
-            vgg16 = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1, progress=show_progress).eval()
+            vgg16 = models.vgg16(
+                weights=models.VGG16_Weights.IMAGENET1K_V1, progress=show_progress
+            ).eval()
         else:
             raise Exception(
                 f"Pretrained weights {pretrained_weights} not yet supported for {self.__class__.__name__} model."
@@ -99,6 +101,7 @@ class Vgg16Experimental(torch.nn.Module):
         x = self.relu1_2(x)
         relu1_2 = x
         x = self.max_pooling1(x)
+        max_pooling1 = x
         x = self.conv2_1(x)
         conv2_1 = x
         x = self.relu2_1(x)
@@ -108,6 +111,7 @@ class Vgg16Experimental(torch.nn.Module):
         x = self.relu2_2(x)
         relu2_2 = x
         x = self.max_pooling2(x)
+        max_pooling2 = x
         x = self.conv3_1(x)
         conv3_1 = x
         x = self.relu3_1(x)
@@ -121,6 +125,7 @@ class Vgg16Experimental(torch.nn.Module):
         x = self.relu3_3(x)
         relu3_3 = x
         x = self.max_pooling3(x)
+        max_pooling3 = x
         x = self.conv4_1(x)
         conv4_1 = x
         x = self.relu4_1(x)
@@ -134,6 +139,7 @@ class Vgg16Experimental(torch.nn.Module):
         x = self.relu4_3(x)
         relu4_3 = x
         x = self.max_pooling4(x)
+        max_pooling4 = x
         x = self.conv5_1(x)
         conv5_1 = x
         x = self.relu5_1(x)
@@ -147,10 +153,10 @@ class Vgg16Experimental(torch.nn.Module):
         x = self.relu5_3(x)
         relu5_3 = x
         x = self.max_pooling5(x)
-        mp5 = x
-        
+        max_pooling5 = x
+
         # AvgPool - handle MPS device limitation
-        if str(x.device).startswith('mps'):
+        if str(x.device).startswith("mps"):
             # Move to CPU for avgpool operation due to MPS limitation
             x_cpu = x.cpu()
             avgpool_result = self.avgpool(x_cpu)
@@ -159,10 +165,10 @@ class Vgg16Experimental(torch.nn.Module):
         else:
             x = self.avgpool(x)
             avgpool = x
-        
+
         # Flatten
         x = torch.flatten(x, 1)
-        
+
         # Classifier
         x = self.linear1(x)
         linear1 = x
@@ -175,8 +181,43 @@ class Vgg16Experimental(torch.nn.Module):
         x = self.linear3(x)
         linear3 = x
 
-        # Finally, expose only the layers that you want to experiment with here
-        vgg_outputs = namedtuple("VggOutputs", self.layer_names)
-        out = vgg_outputs(relu3_3, relu4_1, relu4_2, relu4_3, relu5_1, relu5_2, relu5_3, mp5)
-
-        return out
+        exposed_layers = {
+            "conv1_1": conv1_1,
+            "relu1_1": relu1_1,
+            "conv1_2": conv1_2,
+            "relu1_2": relu1_2,
+            "max_pooling1": max_pooling1,
+            "conv2_1": conv2_1,
+            "relu2_1": relu2_1,
+            "conv2_2": conv2_2,
+            "relu2_2": relu2_2,
+            "max_pooling2": max_pooling2,
+            "conv3_1": conv3_1,
+            "relu3_1": relu3_1,
+            "conv3_2": conv3_2,
+            "relu3_2": relu3_2,
+            "conv3_3": conv3_3,
+            "relu3_3": relu3_3,
+            "max_pooling3": max_pooling3,
+            "conv4_1": conv4_1,
+            "relu4_1": relu4_1,
+            "conv4_2": conv4_2,
+            "relu4_2": relu4_2,
+            "conv4_3": conv4_3,
+            "relu4_3": relu4_3,
+            "max_pooling4": max_pooling4,
+            "conv5_1": conv5_1,
+            "relu5_1": relu5_1,
+            "conv5_2": conv5_2,
+            "relu5_2": relu5_2,
+            "conv5_3": conv5_3,
+            "relu5_3": relu5_3,
+            "max_pooling5": max_pooling5,
+            "avgpool": avgpool,
+            "linear1": linear1,
+            "relu1": relu1,
+            "linear2": linear2,
+            "relu2": relu2,
+            "linear3": linear3,
+        }
+        return exposed_layers
