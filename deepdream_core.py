@@ -7,7 +7,7 @@ import os
 import torch
 import cv2 as cv
 import numpy as np
-
+from torchvision import models
 from config import DEVICE, IMAGENET_MEAN_1, IMAGENET_STD_1, INPUT_DATA_PATH, RUN_CONFIG
 from vgg_experimental import Vgg16Experimental
 from smoothing import CascadeGaussianSmoothing
@@ -26,6 +26,14 @@ def deep_dream_static_image(img=None):
     model = Vgg16Experimental(
         RUN_CONFIG["pretrained_weights"], requires_grad=False, show_progress=True
     ).to(DEVICE)
+    if RUN_CONFIG["layers_to_use"].get("linear3"):
+        linear3_indices = RUN_CONFIG["layers_to_use"]["linear3"]
+        
+        #You can see the list of classes here: https://deeplearning.cms.waikato.ac.nz/user-guide/class-maps/IMAGENET/
+        #NOTE: Esta un poco hardcodeado esto, porque nada asegura que "seleccionemos" ese modelo
+        classes_to_maximize = [models.VGG16_Weights.IMAGENET1K_V1.meta['categories'][i] for i in linear3_indices]
+        classes_to_maximize = [f"{class_name}s" for class_name in classes_to_maximize]
+        print(f"Dreaming about {', '.join(classes_to_maximize)}")
 
     if img is None:  # load either the provided image or start from a pure noise image
         img_path = os.path.join(INPUT_DATA_PATH, RUN_CONFIG["input"])
@@ -81,8 +89,20 @@ def gradient_ascent(model, input_tensor, iteration):
     out = model(input_tensor)
 
     # Step 1: Grab activations/feature maps of interest
-    activations = [out[layer_id_to_use] for layer_id_to_use in RUN_CONFIG["layers_to_use"]]
-
+    activations = []
+    for layer_name, neuron_indices in RUN_CONFIG["layers_to_use"].items():
+        layer_activation = out[layer_name]
+        
+        # If specific neurons are specified, select only those
+        if neuron_indices is not None:
+            if layer_activation.dim() == 4:  # Convolutional layer (B, C, H, W)
+                layer_activation = layer_activation[:, neuron_indices, :, :]
+            elif layer_activation.dim() == 2:  # Fully connected layer (B, N)
+                layer_activation = layer_activation[:, neuron_indices]
+            else:
+                print(f"Warning: Unsupported activation shape for layer {layer_name}: {layer_activation.shape}")
+        
+        activations.append(layer_activation)
     # Step 2: Calculate loss over activations
     losses = []
     for layer_activation in activations:

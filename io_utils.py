@@ -62,7 +62,17 @@ def save_and_maybe_display_image(dump_img, display=False):
 # Again don't worry about all the arguments we'll define them later
 def build_image_name():
     input_name = "rand_noise" if RUN_CONFIG["use_noise"] else RUN_CONFIG["input"].split(".")[0]
-    layers = "_".join(RUN_CONFIG["layers_to_use"])
+    
+    layer_parts = []
+    for layer_name, neuron_indices in RUN_CONFIG["layers_to_use"].items():
+        if neuron_indices is None:
+            layer_parts.append(layer_name)
+        else:
+            # Include neuron indices in filename for specificity
+            indices_str = "_".join(map(str, neuron_indices))
+            layer_parts.append(f"{layer_name}[{indices_str}]")
+    layers = "_".join(layer_parts)
+    
     # Looks awful but makes the creation process transparent for other creators
     img_name = f'{input_name}_width_{RUN_CONFIG["img_width"]}_model_{RUN_CONFIG["model_name"]}_{RUN_CONFIG["pretrained_weights"]}_{layers}_pyrsize_{RUN_CONFIG["pyramid_size"]}_pyrratio_{RUN_CONFIG["pyramid_ratio"]}_iter_{RUN_CONFIG["num_gradient_ascent_iterations"]}_lr_{RUN_CONFIG["lr"]}_shift_{RUN_CONFIG["spatial_shift_size"]}_smooth_{RUN_CONFIG["smoothing_coefficient"]}_seed_{RUN_CONFIG["seed"]}.jpg'
     return img_name

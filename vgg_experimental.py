@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 from torchvision import models
 
-from config import DEVICE, SupportedModels, SupportedPretrainedWeights
+from config import SupportedPretrainedWeights
 
 
 class Vgg16Experimental(torch.nn.Module):
@@ -28,18 +28,6 @@ class Vgg16Experimental(torch.nn.Module):
         vgg_pretrained_features = vgg16.features
         vgg_avgpool = vgg16.avgpool
         vgg_classifier = vgg16.classifier
-
-        # I've exposed the best/most interesting layers in my subjective opinion (mp5 is not that good though)
-        self.layer_names = [
-            "relu3_3",
-            "relu4_1",
-            "relu4_2",
-            "relu4_3",
-            "relu5_1",
-            "relu5_2",
-            "relu5_3",
-            "mp5",
-        ]
 
         # 31 layers in total for the VGG16
         self.conv1_1 = vgg_pretrained_features[0]
