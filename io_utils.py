@@ -57,9 +57,7 @@ def load_image(img_path, target_shape=None):
     return img
 
 
-# config is just a shared dictionary that you'll be seeing used everywhere, but we'll define it a bit later.
-# For the time being think of it as an oracle - whatever the function needs - config provides ^^
-def save_and_maybe_display_image(config, dump_img, name_modifier=None):
+def save_and_maybe_display_image(config, dump_img, display=False):
     assert isinstance(dump_img, np.ndarray), f"Expected numpy array got {type(dump_img)}."
 
     # Step 1: figure out the dump dir location
@@ -67,10 +65,7 @@ def save_and_maybe_display_image(config, dump_img, name_modifier=None):
     os.makedirs(dump_dir, exist_ok=True)
 
     # Step 2: define the output image name
-    if name_modifier is not None:
-        dump_img_name = str(name_modifier).zfill(6) + ".jpg"
-    else:
-        dump_img_name = build_image_name(config)
+    dump_img_name = build_image_name(config)
 
     if dump_img.dtype != np.uint8:
         dump_img = (dump_img * 255).astype(np.uint8)
@@ -81,7 +76,7 @@ def save_and_maybe_display_image(config, dump_img, name_modifier=None):
     cv.imwrite(dump_path, dump_img[:, :, ::-1])
 
     # Step 4: potentially display/plot the image
-    if config["should_display"]:
+    if display:
         fig = plt.figure(
             figsize=(7.5, 5), dpi=100
         )  # otherwise plots are really small in Jupyter Notebook
