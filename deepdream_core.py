@@ -5,6 +5,7 @@
 import os
 
 import torch
+import torch.nn.functional as F
 import cv2 as cv
 import numpy as np
 from torchvision import models
@@ -18,7 +19,6 @@ from processing_utils import (
     pytorch_input_adapter,
     pytorch_output_adapter,
     get_new_shape,
-    random_circular_spatial_shift,
 )
 
 
@@ -28,10 +28,12 @@ def deep_dream_static_image(img=None):
     ).to(DEVICE)
     if RUN_CONFIG["layers_to_use"].get("linear3"):
         linear3_indices = RUN_CONFIG["layers_to_use"]["linear3"]
-        
-        #You can see the list of classes here: https://deeplearning.cms.waikato.ac.nz/user-guide/class-maps/IMAGENET/
-        #NOTE: Esta un poco hardcodeado esto, porque nada asegura que "seleccionemos" ese modelo
-        classes_to_maximize = [models.VGG16_Weights.IMAGENET1K_V1.meta['categories'][i] for i in linear3_indices]
+
+        # You can see the list of classes here: https://deeplearning.cms.waikato.ac.nz/user-guide/class-maps/IMAGENET/
+        # NOTE: Esta un poco hardcodeado esto, porque nada asegura que "seleccionemos" ese modelo
+        classes_to_maximize = [
+            models.VGG16_Weights.IMAGENET1K_V1.meta["categories"][i] for i in linear3_indices
+        ]
         classes_to_maximize = [f"{class_name}s" for class_name in classes_to_maximize]
         print(f"Dreaming about {', '.join(classes_to_maximize)}")
 
@@ -56,20 +58,8 @@ def deep_dream_static_image(img=None):
         input_tensor = pytorch_input_adapter(img)  # convert to trainable tensor
 
         for iteration in range(RUN_CONFIG["num_gradient_ascent_iterations"]):
-
-            # Introduce some randomness, it will give us more diverse results especially when you're making videos
-            h_shift, w_shift = np.random.randint(
-                -RUN_CONFIG["spatial_shift_size"], RUN_CONFIG["spatial_shift_size"] + 1, 2
-            )
-            input_tensor = random_circular_spatial_shift(input_tensor, h_shift, w_shift)
-
             # This is where the magic happens, treat it as a black box until the next cell
             gradient_ascent(model, input_tensor, iteration)
-
-            # Roll back by the same amount as above (hence should_undo=True)
-            input_tensor = random_circular_spatial_shift(
-                input_tensor, h_shift, w_shift, should_undo=True
-            )
 
         img = pytorch_output_adapter(input_tensor)
 
@@ -84,15 +74,12 @@ UPPER_IMAGE_BOUND = torch.tensor(((1 - IMAGENET_MEAN_1) / IMAGENET_STD_1).reshap
 )
 
 
-def gradient_ascent(model, input_tensor, iteration):
-    # Step 0: Feed forward pass
-    out = model(input_tensor)
+def calculate_loss(model_input, model_output):
 
     # Step 1: Grab activations/feature maps of interest
     activations = []
     for layer_name, neuron_indices in RUN_CONFIG["layers_to_use"].items():
-        layer_activation = out[layer_name]
-        
+        layer_activation = model_output[layer_name]
         # If specific neurons are specified, select only those
         if neuron_indices is not None:
             if layer_activation.dim() == 4:  # Convolutional layer (B, C, H, W)
@@ -100,8 +87,9 @@ def gradient_ascent(model, input_tensor, iteration):
             elif layer_activation.dim() == 2:  # Fully connected layer (B, N)
                 layer_activation = layer_activation[:, neuron_indices]
             else:
-                print(f"Warning: Unsupported activation shape for layer {layer_name}: {layer_activation.shape}")
-        
+                print(
+                    f"Warning: Unsupported activation shape for layer {layer_name}: {layer_activation.shape}"
+                )
         activations.append(layer_activation)
     # Step 2: Calculate loss over activations
     losses = []
@@ -116,6 +104,16 @@ def gradient_ascent(model, input_tensor, iteration):
         losses.append(loss_component)
 
     loss = torch.mean(torch.stack(losses))
+
+    return loss
+
+
+def gradient_ascent(model, input_tensor, iteration):
+    # Step 0: Feed forward pass
+    model_output = model(input_tensor)
+
+    loss = calculate_loss(input_tensor, model_output)
+
     loss.backward()
 
     # Step 3: Process image gradients (smoothing + normalization, more an art then a science)
