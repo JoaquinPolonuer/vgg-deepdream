@@ -5,6 +5,7 @@
 import os
 
 import torch
+import torch.nn.functional as F
 import cv2 as cv
 import numpy as np
 from torchvision import models
@@ -18,7 +19,6 @@ from processing_utils import (
     pytorch_input_adapter,
     pytorch_output_adapter,
     get_new_shape,
-    random_circular_spatial_shift,
 )
 
 

@@ -4,22 +4,26 @@
 seed: 43
 
 # Common params
-input: "cloud.jpg"
+input: "spock.jpeg"
 img_width: 600
 layers_to_use:
-  # relu4_2: null
-  linear3: [954]
+  # relu1_2: [8]
+  # relu2_2: [12]
+  # relu3_3: [30]
+  # relu4_3: null #[39]
+  # relu5_3: [52]
+  linear3: [947]
 
 model_name: "VGG16_EXPERIMENTAL"
 pretrained_weights: "IMAGENET"
 
 # Main params for experimentation
-pyramid_size: 2
-pyramid_ratio: 2
-num_gradient_ascent_iterations: 100
+pyramid_size: 5
+pyramid_ratio: 1.8
+num_gradient_ascent_iterations: 30
 lr: 0.09
 
 # Params you usually won't need to change as often
 spatial_shift_size: 32
-smoothing_coefficient: 0.8
-use_noise: false
+smoothing_coefficient: 0.3
+use_noise: true
