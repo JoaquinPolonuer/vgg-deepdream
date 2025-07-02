@@ -28,10 +28,12 @@ def deep_dream_static_image(img=None):
     ).to(DEVICE)
     if RUN_CONFIG["layers_to_use"].get("linear3"):
         linear3_indices = RUN_CONFIG["layers_to_use"]["linear3"]
-        
-        #You can see the list of classes here: https://deeplearning.cms.waikato.ac.nz/user-guide/class-maps/IMAGENET/
-        #NOTE: Esta un poco hardcodeado esto, porque nada asegura que "seleccionemos" ese modelo
-        classes_to_maximize = [models.VGG16_Weights.IMAGENET1K_V1.meta['categories'][i] for i in linear3_indices]
+
+        # You can see the list of classes here: https://deeplearning.cms.waikato.ac.nz/user-guide/class-maps/IMAGENET/
+        # NOTE: Esta un poco hardcodeado esto, porque nada asegura que "seleccionemos" ese modelo
+        classes_to_maximize = [
+            models.VGG16_Weights.IMAGENET1K_V1.meta["categories"][i] for i in linear3_indices
+        ]
         classes_to_maximize = [f"{class_name}s" for class_name in classes_to_maximize]
         print(f"Dreaming about {', '.join(classes_to_maximize)}")
 
@@ -42,6 +44,7 @@ def deep_dream_static_image(img=None):
         if RUN_CONFIG["use_noise"]:
             shape = img.shape
             img = np.random.uniform(low=0.0, high=1.0, size=shape).astype(np.float32)
+            # img = np.zeros(shape, dtype=np.float32)
 
     img = pre_process_numpy_img(img)
     original_shape = img.shape[:-1]  # save initial height and width
@@ -58,18 +61,18 @@ def deep_dream_static_image(img=None):
         for iteration in range(RUN_CONFIG["num_gradient_ascent_iterations"]):
 
             # Introduce some randomness, it will give us more diverse results especially when you're making videos
-            h_shift, w_shift = np.random.randint(
-                -RUN_CONFIG["spatial_shift_size"], RUN_CONFIG["spatial_shift_size"] + 1, 2
-            )
-            input_tensor = random_circular_spatial_shift(input_tensor, h_shift, w_shift)
+            # h_shift, w_shift = np.random.randint(
+            #     -RUN_CONFIG["spatial_shift_size"], RUN_CONFIG["spatial_shift_size"] + 1, 2
+            # )
+            # input_tensor = random_circular_spatial_shift(input_tensor, h_shift, w_shift)
 
             # This is where the magic happens, treat it as a black box until the next cell
             gradient_ascent(model, input_tensor, iteration)
 
             # Roll back by the same amount as above (hence should_undo=True)
-            input_tensor = random_circular_spatial_shift(
-                input_tensor, h_shift, w_shift, should_undo=True
-            )
+            # input_tensor = random_circular_spatial_shift(
+            #     input_tensor, h_shift, w_shift, should_undo=True
+            # )
 
         img = pytorch_output_adapter(input_tensor)
 
@@ -84,15 +87,26 @@ UPPER_IMAGE_BOUND = torch.tensor(((1 - IMAGENET_MEAN_1) / IMAGENET_STD_1).reshap
 )
 
 
-def gradient_ascent(model, input_tensor, iteration):
-    # Step 0: Feed forward pass
-    out = model(input_tensor)
+def total_variation_loss(x, p=1):
+    tv_h = (
+        torch.abs(x[:, :, 1:, :] - x[:, :, :-1, :])
+        if p == 1
+        else (x[:, :, 1:, :] - x[:, :, :-1, :]) ** 2
+    )
+    tv_w = (
+        torch.abs(x[:, :, :, 1:] - x[:, :, :, :-1])
+        if p == 1
+        else (x[:, :, :, 1:] - x[:, :, :, :-1]) ** 2
+    )
+    return tv_h.mean() + tv_w.mean()
+
+
+def calculate_loss(model_input, model_output):
 
     # Step 1: Grab activations/feature maps of interest
     activations = []
     for layer_name, neuron_indices in RUN_CONFIG["layers_to_use"].items():
-        layer_activation = out[layer_name]
-        
+        layer_activation = model_output[layer_name]
         # If specific neurons are specified, select only those
         if neuron_indices is not None:
             if layer_activation.dim() == 4:  # Convolutional layer (B, C, H, W)
@@ -100,8 +114,9 @@ def gradient_ascent(model, input_tensor, iteration):
             elif layer_activation.dim() == 2:  # Fully connected layer (B, N)
                 layer_activation = layer_activation[:, neuron_indices]
             else:
-                print(f"Warning: Unsupported activation shape for layer {layer_name}: {layer_activation.shape}")
-        
+                print(
+                    f"Warning: Unsupported activation shape for layer {layer_name}: {layer_activation.shape}"
+                )
         activations.append(layer_activation)
     # Step 2: Calculate loss over activations
     losses = []
@@ -115,7 +130,22 @@ def gradient_ascent(model, input_tensor, iteration):
         )
         losses.append(loss_component)
 
-    loss = torch.mean(torch.stack(losses))
+    loss = (
+        torch.mean(torch.stack(losses))
+        # - 10 * total_variation_loss(model_input, 2)
+        # - 20 * model_input.var()
+        # - 20 * torch.norm(model_input, 2)
+    )
+
+    return loss
+
+
+def gradient_ascent(model, input_tensor, iteration):
+    # Step 0: Feed forward pass
+    model_output = model(input_tensor)
+
+    loss = calculate_loss(input_tensor, model_output)
+
     loss.backward()
 
     # Step 3: Process image gradients (smoothing + normalization, more an art then a science)
