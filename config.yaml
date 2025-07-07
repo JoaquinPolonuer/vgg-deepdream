@@ -5,7 +5,7 @@ seed: 43
 
 # Common params
 input: "spock.jpeg"
-img_width: 600
+img_width: 1024
 layers_to_use:
   # relu1_2: [8]
   # relu2_2: [12]
@@ -18,12 +18,12 @@ model_name: "VGG16_EXPERIMENTAL"
 pretrained_weights: "IMAGENET"
 
 # Main params for experimentation
-pyramid_size: 5
+pyramid_size: 6
 pyramid_ratio: 1.8
-num_gradient_ascent_iterations: 30
+num_gradient_ascent_iterations: 5
 lr: 0.09
 
 # Params you usually won't need to change as often
 spatial_shift_size: 32
-smoothing_coefficient: 0.3
+smoothing_coefficient: 0.1
 use_noise: true
